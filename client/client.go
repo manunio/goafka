@@ -11,8 +11,9 @@ const defaultScratchSize = 64 * 1024
 
 // Simple represents an instance of client connected to a set of goafka servers.
 type Simple struct {
-	addrs []string
-	buf   bytes.Buffer
+	addrs   []string
+	buf     bytes.Buffer
+	restBuf bytes.Buffer
 }
 
 // NewClient creates a new client for goafka server.
@@ -36,23 +37,41 @@ func (s *Simple) Receive(scratch []byte) ([]byte, error) {
 		scratch = make([]byte, defaultScratchSize)
 	}
 
-	n, err := s.buf.Read(scratch)
+	off := 0
+
+	if s.restBuf.Len() > 0 {
+		if s.restBuf.Len() >= len(scratch) {
+			return nil, errBufTooSmall
+		}
+
+		n, err := s.restBuf.Read(scratch)
+		if err != nil {
+			return nil, err
+		}
+
+		s.restBuf.Reset()
+		off += n
+	}
+
+	n, err := s.buf.Read(scratch[off:])
 	if err != nil {
 		return nil, err
 	}
 
-	truncated, rest, err := cutToLastMessage(scratch[0:n])
+	truncated, rest, err := cutToLastMessage(scratch[0 : n+off])
 	if err != nil {
 		return nil, err
 	}
 
-	_ = rest
+	s.restBuf.Reset()
+	s.restBuf.Write(rest)
 
 	return truncated, nil
 }
 
 func cutToLastMessage(res []byte) (truncated []byte, rest []byte, err error) {
 	n := len(res)
+
 	if n == 0 {
 		return res, nil, nil
 	}
