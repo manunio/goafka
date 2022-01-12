@@ -16,7 +16,7 @@ type Simple struct {
 	restBuf bytes.Buffer
 }
 
-// NewClient creates a new client for goafka server.
+// NewSimple creates a new client for goafka server.
 func NewSimple(addrs []string) *Simple {
 	return &Simple{
 		addrs: addrs,
@@ -58,6 +58,7 @@ func (s *Simple) Receive(scratch []byte) ([]byte, error) {
 		return nil, err
 	}
 
+	// example: truncated = "100\n101\n", rest = "10"
 	truncated, rest, err := cutToLastMessage(scratch[0 : n+off])
 	if err != nil {
 		return nil, err
